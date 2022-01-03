@@ -1,15 +1,32 @@
-## Micronaut 3.1.4 Documentation
+## Steps to reproduce
 
-- [User Guide](https://docs.micronaut.io/3.1.4/guide/index.html)
-- [API Reference](https://docs.micronaut.io/3.1.4/api/index.html)
-- [Configuration Reference](https://docs.micronaut.io/3.1.4/guide/configurationreference.html)
-- [Micronaut Guides](https://guides.micronaut.io/index.html)
+```bash
+./gradlew test
 
----
+> Task :test
 
-## Feature http-client documentation
+BeanInitializationDeadlockSpec > deadlockTest() FAILED
+    org.opentest4j.AssertionFailedError at BeanInitializationDeadlockSpec.java:22
+        Caused by: org.junit.jupiter.api.AssertTimeout$ExecutionTimeoutException at BeanInitializationDeadlockSpec.java:23
+<===========--> 85% EXECUTING [18s]
+> :test > 1 test completed, 1 failed
+> :test > Executing test com.example...controller.BeanInitializationDeadlockSpec
+```
 
-- [Micronaut HTTP Client documentation](https://docs.micronaut.io/latest/guide/index.html#httpClient)
+If the repro-steps were successful the process will hang indefinitiely due to deadlock situation.
+
+## Investigation
+
+Thread dump of two threads waiting for each other is below.
+
+Locks in play:
+
+- `RequestCustomScope`'s `ReentrantReadWriteLock` (in its base class `AbstractConcurrentCustomScope`)
+- `singletonObjects` monitor (by using `synchronized` keyword)
+
+What is happening is that one thread (for http request) acquires write lock of `RequestCustomScope`. While initialization this request-scoped bean a singleton bean dependency is needed (need to enter `singletonObjects` synchronized block). But before this singleton block is entered, another thread acquires `singletonObjects` monitor.
+
+This other thread is in the stage when it is in a `singletonObjects` synchronized block to create some bean. In the case above the bean to initialize itself is not a singleton (but prototype), but is produced by a factory (which is singleton - not sure if it plays a role). The key point is here that thread is in `singletonObjects` synchronized section. The factory itself however needs a request-scope dependency and therefore to obtain read lock of `RequestCustomScope`'s `ReentrantReadWriteLock`.
 
 ## Thread dump
 
