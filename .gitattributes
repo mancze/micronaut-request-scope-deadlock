@@ -1,0 +1,17 @@
+# Make GIT take care of potential line separator differences between files
+#
+#  - Force all text files to "Lf" in the repo, warning and auto-converting if a user tries to commit a CrLf file or even
+#    line in a text file
+#  - Always Check out to disk using "Lf"
+#
+# This means that users who create CrLf files can end up with local CrLf files that got committed as Lf - they have
+# locally-inconsistent CrLf files *only* in the case where they created them.
+#
+# Users should never have to worry about this or configure their settings - their git "core.autocrlf" setting WILL
+# ALWAYS BE IGNORED in this repo.
+#
+* text=auto eol=lf
+
+# There is an exception for Windows batch files, which needs CrLf line endings to work properly
+*.bat text eol=crlf
+*.cmd text eol=crlf
